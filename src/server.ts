@@ -97,6 +97,17 @@ initializeApp();
  *     responses:
  *       201:
  *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
  *       400:
  *         description: User already exists
  *       500:
@@ -124,7 +135,24 @@ app.post('/api/auth/register', async (req, res) => {
         // Save user to database
         await userRepository.save(user);
 
-        res.status(201).json({ message: 'User registered successfully' });
+        // Generate tokens
+        const accessToken = jwt.sign(
+            { userId: user.id, email: user.email },
+            JWT_SECRET,
+            { expiresIn: '15m' }
+        );
+
+        const refreshToken = jwt.sign(
+            { userId: user.id, email: user.email },
+            JWT_REFRESH_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.status(201).json({ 
+            message: 'User registered successfully',
+            accessToken,
+            refreshToken
+        });
     } catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({ message: 'Error registering user' });
