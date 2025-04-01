@@ -424,6 +424,95 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   put:
+ *     summary: Update user profile information
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               profileImage:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     phone:
+ *                       type: string
+ *                     profileImage:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+app.put('/api/auth/profile', authenticateToken, async (req, res) => {
+    try {
+        const { name, phone, profileImage } = req.body;
+        const userRepository = AppDataSource.getRepository(User);
+        
+        // Find user
+        const user = await userRepository.findOne({ where: { id: req.user!.userId } });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Update user fields if provided
+        if (name !== undefined) user.name = name;
+        if (phone !== undefined) user.phone = phone;
+        if (profileImage !== undefined) user.profileImage = profileImage;
+
+        // Save updated user
+        await userRepository.save(user);
+
+        // Remove password from response
+        const { password: _, ...userWithoutPassword } = user;
+
+        res.json({
+            message: 'Profile updated successfully',
+            user: userWithoutPassword
+        });
+    } catch (error) {
+        console.error('Update profile error:', error);
+        res.status(500).json({ message: 'Error updating profile' });
+    }
+});
+
 // Middleware to verify JWT token
 function authenticateToken(req: any, res: any, next: any) {
     const authHeader = req.headers['authorization'];
