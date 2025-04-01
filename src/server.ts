@@ -94,6 +94,12 @@ initializeApp();
  *               password:
  *                 type: string
  *                 format: password
+ *               name:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               profileImage:
+ *                 type: string
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -108,6 +114,19 @@ initializeApp();
  *                   type: string
  *                 refreshToken:
  *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     phone:
+ *                       type: string
+ *                     profileImage:
+ *                       type: string
  *       400:
  *         description: User already exists
  *       500:
@@ -115,7 +134,7 @@ initializeApp();
  */
 app.post('/api/auth/register', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, name, phone, profileImage } = req.body;
 
         // Check if user already exists
         const userRepository = AppDataSource.getRepository(User);
@@ -131,6 +150,9 @@ app.post('/api/auth/register', async (req, res) => {
         const user = new User();
         user.email = email;
         user.password = hashedPassword;
+        user.name = name;
+        user.phone = phone;
+        user.profileImage = profileImage;
 
         // Save user to database
         await userRepository.save(user);
@@ -148,10 +170,14 @@ app.post('/api/auth/register', async (req, res) => {
             { expiresIn: '7d' }
         );
 
+        // Remove password from response
+        const { password: _, ...userWithoutPassword } = user;
+
         res.status(201).json({ 
             message: 'User registered successfully',
             accessToken,
-            refreshToken
+            refreshToken,
+            user: userWithoutPassword
         });
     } catch (error) {
         console.error('Registration error:', error);
@@ -193,6 +219,19 @@ app.post('/api/auth/register', async (req, res) => {
  *                   type: string
  *                 refreshToken:
  *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     phone:
+ *                       type: string
+ *                     profileImage:
+ *                       type: string
  *       401:
  *         description: Invalid credentials
  *       500:
@@ -228,9 +267,13 @@ app.post('/api/auth/login', async (req, res) => {
             { expiresIn: '7d' }
         );
 
+        // Remove password from response
+        const { password: _, ...userWithoutPassword } = user;
+
         res.json({
             accessToken,
-            refreshToken
+            refreshToken,
+            user: userWithoutPassword
         });
     } catch (error) {
         console.error('Login error:', error);

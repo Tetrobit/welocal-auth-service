@@ -11,6 +11,15 @@ export class User {
     @Column({ type: "varchar" })
     password!: string;
 
+    @Column({ nullable: true })
+    name!: string;
+
+    @Column({ nullable: true })
+    phone!: string;
+
+    @Column({ nullable: true })
+    profileImage!: string;
+
     @CreateDateColumn({ type: "timestamp" })
     createdAt!: Date;
 
