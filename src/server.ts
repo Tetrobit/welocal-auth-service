@@ -3,8 +3,10 @@ import express, { Request } from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import swaggerUi from 'swagger-ui-express';
 import { AppDataSource } from "./config/database";
 import createDatabase from "./config/init-db";
+import { swaggerSpec } from "./config/swagger";
 import { User } from "./entities/User";
 import dotenv from "dotenv";
 
@@ -29,6 +31,9 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Swagger UI
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // JWT Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
@@ -46,6 +51,7 @@ async function initializeApp() {
         // Start the server
         app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
+            console.log(`Swagger documentation available at http://localhost:${PORT}/docs`);
         });
     } catch (error) {
         console.error("Error during initialization:", error);
@@ -56,7 +62,36 @@ async function initializeApp() {
 // Start the application
 initializeApp();
 
-// Authentication Routes
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *       400:
+ *         description: User already exists
+ *       500:
+ *         description: Server error
+ */
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -86,6 +121,45 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *       401:
+ *         description: Invalid credentials
+ *       500:
+ *         description: Server error
+ */
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -126,6 +200,36 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/auth/refresh-token:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: New access token generated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *       401:
+ *         description: Invalid refresh token
+ */
 app.post('/api/auth/refresh-token', (req, res) => {
     try {
         const { refreshToken } = req.body;
@@ -150,7 +254,36 @@ app.post('/api/auth/refresh-token', (req, res) => {
     }
 });
 
-// Protected route example
+/**
+ * @swagger
+ * /api/protected:
+ *   get:
+ *     summary: Get protected route example
+ *     tags: [Protected]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Protected data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     userId:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Invalid token
+ */
 app.get('/api/protected', authenticateToken, (req: Request, res) => {
     res.json({ message: 'This is a protected route', user: req.user });
 });
