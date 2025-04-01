@@ -4,8 +4,21 @@ import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { AppDataSource } from "./config/database";
+import createDatabase from "./config/init-db";
 import { User } from "./entities/User";
 import dotenv from "dotenv";
+
+// Extend Express Request type
+declare global {
+    namespace Express {
+        interface Request {
+            user?: {
+                userId: string;
+                email: string;
+            }
+        }
+    }
+}
 
 dotenv.config();
 
@@ -20,24 +33,28 @@ app.use(express.json());
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
 
-// Extend Express Request type
-declare global {
-    namespace Express {
-        interface Request {
-            user?: {
-                userId: string;
-                email: string;
-            }
-        }
+// Initialize Database and TypeORM
+async function initializeApp() {
+    try {
+        // Create database if it doesn't exist
+        await createDatabase();
+        
+        // Initialize TypeORM
+        await AppDataSource.initialize();
+        console.log("Data Source has been initialized!");
+        
+        // Start the server
+        app.listen(PORT, () => {
+            console.log(`Server is running on port ${PORT}`);
+        });
+    } catch (error) {
+        console.error("Error during initialization:", error);
+        process.exit(1);
     }
 }
 
-// Initialize TypeORM
-AppDataSource.initialize()
-    .then(() => {
-        console.log("Data Source has been initialized!");
-    })
-    .catch((error: any) => console.log("Error during Data Source initialization:", error));
+// Start the application
+initializeApp();
 
 // Authentication Routes
 app.post('/api/auth/register', async (req, res) => {
@@ -154,8 +171,4 @@ function authenticateToken(req: any, res: any, next: any) {
         req.user = user;
         next();
     });
-}
-
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-}); 
+} 
