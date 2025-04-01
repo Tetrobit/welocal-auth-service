@@ -1,8 +1,13 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+import "reflect-metadata";
+import express, { Request } from "express";
+import cors from "cors";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { AppDataSource } from "./config/database";
+import { User } from "./entities/User";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,12 +16,28 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// In-memory user storage (replace with database in production)
-const users = [];
-
 // JWT Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
+
+// Extend Express Request type
+declare global {
+    namespace Express {
+        interface Request {
+            user?: {
+                userId: string;
+                email: string;
+            }
+        }
+    }
+}
+
+// Initialize TypeORM
+AppDataSource.initialize()
+    .then(() => {
+        console.log("Data Source has been initialized!");
+    })
+    .catch((error: any) => console.log("Error during Data Source initialization:", error));
 
 // Authentication Routes
 app.post('/api/auth/register', async (req, res) => {
@@ -24,7 +45,9 @@ app.post('/api/auth/register', async (req, res) => {
         const { email, password } = req.body;
 
         // Check if user already exists
-        if (users.find(user => user.email === email)) {
+        const userRepository = AppDataSource.getRepository(User);
+        const existingUser = await userRepository.findOne({ where: { email } });
+        if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
         }
 
@@ -32,16 +55,16 @@ app.post('/api/auth/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Create new user
-        const user = {
-            id: users.length + 1,
-            email,
-            password: hashedPassword
-        };
+        const user = new User();
+        user.email = email;
+        user.password = hashedPassword;
 
-        users.push(user);
+        // Save user to database
+        await userRepository.save(user);
 
         res.status(201).json({ message: 'User registered successfully' });
     } catch (error) {
+        console.error('Registration error:', error);
         res.status(500).json({ message: 'Error registering user' });
     }
 });
@@ -51,7 +74,8 @@ app.post('/api/auth/login', async (req, res) => {
         const { email, password } = req.body;
 
         // Find user
-        const user = users.find(user => user.email === email);
+        const userRepository = AppDataSource.getRepository(User);
+        const user = await userRepository.findOne({ where: { email } });
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
@@ -80,6 +104,7 @@ app.post('/api/auth/login', async (req, res) => {
             refreshToken
         });
     } catch (error) {
+        console.error('Login error:', error);
         res.status(500).json({ message: 'Error logging in' });
     }
 });
@@ -93,7 +118,7 @@ app.post('/api/auth/refresh-token', (req, res) => {
         }
 
         // Verify refresh token
-        const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+        const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as { userId: string; email: string };
 
         // Generate new access token
         const accessToken = jwt.sign(
@@ -109,12 +134,12 @@ app.post('/api/auth/refresh-token', (req, res) => {
 });
 
 // Protected route example
-app.get('/api/protected', authenticateToken, (req, res) => {
+app.get('/api/protected', authenticateToken, (req: Request, res) => {
     res.json({ message: 'This is a protected route', user: req.user });
 });
 
 // Middleware to verify JWT token
-function authenticateToken(req, res, next) {
+function authenticateToken(req: any, res: any, next: any) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -122,7 +147,7 @@ function authenticateToken(req, res, next) {
         return res.status(401).json({ message: 'Access token required' });
     }
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
         if (err) {
             return res.status(403).json({ message: 'Invalid access token' });
         }
