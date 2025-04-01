@@ -369,6 +369,61 @@ app.get('/api/protected', authenticateToken, (req: Request, res) => {
     res.json({ message: 'This is a protected route', user: req.user });
 });
 
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current user information
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User information retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                 phone:
+ *                   type: string
+ *                 profileImage:
+ *                   type: string
+ *                 createdAt:
+ *                   type: string
+ *                   format: date-time
+ *                 updatedAt:
+ *                   type: string
+ *                   format: date-time
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *       500:
+ *         description: Server error
+ */
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+    try {
+        const userRepository = AppDataSource.getRepository(User);
+        const user = await userRepository.findOne({ where: { id: req.user!.userId } });
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Remove password from response
+        const { password: _, ...userWithoutPassword } = user;
+        res.json(userWithoutPassword);
+    } catch (error) {
+        console.error('Get user info error:', error);
+        res.status(500).json({ message: 'Error getting user information' });
+    }
+});
+
 // Middleware to verify JWT token
 function authenticateToken(req: any, res: any, next: any) {
     const authHeader = req.headers['authorization'];
